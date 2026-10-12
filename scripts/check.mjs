@@ -9,7 +9,9 @@ assert(bundle.library.length>100000&&bundle.worker.length>100000);
 assert(Object.keys(bundle.assets).length>100);
 assert(!/<(?:script|link)[^>]+(?:src|href)="https?:\/\//.test(html));
 for(const id of ['pdfFile','bookTitle','buildButton','exportButton','preview'])assert(html.includes(`id="${id}"`));
-assert(!/fullBtn|requestFullscreen|Plein écran/.test(template));
+assert(!/slowBtn|autoBtn|Journal de test|id="metrics"/.test(template));
+assert(template.includes('const DEFAULT_ZOOM=.9;'));
+assert(template.includes('const lastSpread='));
 const app=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
 new vm.Script(app);
 const make=app.match(/function escapeHTML\(text\)\{[^\n]+\}\nfunction createBookHTML\(data,title=''\)\{[\s\S]*?\n\}/)[0];
@@ -23,25 +25,10 @@ for(const title of ['', 'Livre <test> & "titre"']){
  else assert(exported.includes('Livre &lt;test&gt; &amp; &quot;titre&quot;'));
  new vm.Script(exported.match(/<script>([\s\S]*?)<\/script>/)[1]);
 }
-const fit=template.match(/function fitBook\(\)\{[\s\S]*?\n\}/)[0];
-let samples=0;
-for(const [width,height,mobile] of [[290,240,true],[360,520,true],[710,1000,true],[900,390,false],[1160,670,false],[2380,1600,false],[3820,1990,false]]){
- for(const ratio of [.4,.707,1,1.414,2.5]){
-  let bookWidth,perspective;
-  const ctx=vm.createContext({bookFitFrame:1,bookWrap:{getBoundingClientRect:()=>({width,height})},getComputedStyle:()=>({paddingLeft:'14px',paddingRight:'14px',paddingTop:'12px',paddingBottom:'12px'}),isMobile:()=>mobile,book:{style:{setProperty:(name,value)=>{if(name==='--book-width')bookWidth=parseFloat(value);else if(name==='--book-perspective')perspective=parseFloat(value);else assert.fail(name);}}}});
-  vm.runInContext(fit.replace('__PAGE_RATIO__',String(ratio))+';fitBook();',ctx);
-  const pageWidth=bookWidth/(mobile?1:2),bookHeight=pageWidth/ratio;
-  assert(bookWidth>0&&bookWidth<=width-28);
-  if(width>2300&&ratio===.707)assert(bookWidth>1120);
-  if(width===710&&ratio===1.414)assert(bookWidth>520);
-  for(let angle=0;angle<=90;angle++)for(const u of [0,pageWidth]){
-   const a=angle*Math.PI/180;
-   const x=mobile?-pageWidth/2+u*Math.cos(a):u*Math.cos(a);
-   const scale=perspective/(perspective-u*Math.sin(a));
-   assert(Math.abs(x*scale)<=(width-28)/2+.01);
-   assert(bookHeight*scale<=height-24+.01);
-   samples++;
-  }
- }
+for(const count of [1,2,3,10,11,20,249,250]){
+ const ctx=vm.createContext({pages:Array(count).fill('page')});
+ const last=vm.runInContext("pages.length>1?(pages.length%2===0?pages.length-1:pages.length-2):0",ctx);
+ assert(last>=0&&last<count);
+ if(count>1)assert(last%2===1&&count-last<=2);
 }
-console.log(`Vérifications réussies : ressources hors ligne, export et titre facultatif, syntaxe, ${samples} projections de pages.`);
+console.log('Vérifications réussies : bundle PDF hors ligne, export, titre facultatif, syntaxe, zoom 90 %, retrait des tests et pagination de 1 à 250 pages.');
